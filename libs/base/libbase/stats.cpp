@@ -281,7 +281,7 @@ std::string summaryStats(const std::vector<double> &values, int decimals) {
 
 // ---- Explicit instantiations (only allowed types) ----
 template std::string toPercent<int>(int part, int total);
-template std::string toPercent<float>(float part, double total);
+template std::string toPercent<float>(float part, float total);
 template std::string toPercent<double>(double part, double total);
 template std::string toPercent<std::size_t>(std::size_t part, std::size_t total);
 template std::string toPercent<std::uint8_t>(std::uint8_t part, std::uint8_t total);
