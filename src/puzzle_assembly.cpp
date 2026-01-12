@@ -504,7 +504,7 @@ PuzzleAssemblyResult assemblePuzzle(
     PuzzleAssemblyResult res;
     res.W = W;
     res.H = H;
-    res.grid.assign(static_cast<size_t>(W) * static_cast<size_t>(H), PlacedPiece{-1, 0});
+    res.grid.assign(W * H, PlacedPiece{-1, 0});
 
     for (int obj = 0; obj < objects_count; ++obj) {
         const int x = objX[static_cast<size_t>(obj)];
@@ -512,57 +512,23 @@ PuzzleAssemblyResult assemblePuzzle(
         const int rot = objRot[static_cast<size_t>(obj)];
         rassert(rot >= 0 && rot < 4, 90100026);
 
-        const size_t idx = static_cast<size_t>(y) * static_cast<size_t>(W) + static_cast<size_t>(x);
+        const size_t idx = y * W + x;
         rassert(res.grid[idx].obj == -1, 90100027, "Cell already filled", x, y);
         res.grid[idx] = PlacedPiece{obj, rot};
     }
 
-    // Compute per-column widths and per-row heights from median piece corner distances (after logical rotation)
-    res.colW.assign(static_cast<size_t>(W), 0);
-    res.rowH.assign(static_cast<size_t>(H), 0);
-
-    std::vector<std::vector<float>> colWidths(static_cast<size_t>(W));
-    std::vector<std::vector<float>> rowHeights(static_cast<size_t>(H));
-
-    for (int y = 0; y < H; ++y) {
-        for (int x = 0; x < W; ++x) {
-            const PlacedPiece pp = res.grid[static_cast<size_t>(y) * static_cast<size_t>(W) + static_cast<size_t>(x)];
-            rassert(pp.obj >= 0, 90100028);
-
-            const auto& corners = objCorners[static_cast<size_t>(pp.obj)];
-
-            // Board corners: TL=3, TR=0, BR=1, BL=2
-            const point2i TL = corners[static_cast<size_t>(pieceCornerFromBoardCorner(3, pp.rot90))];
-            const point2i TR = corners[static_cast<size_t>(pieceCornerFromBoardCorner(0, pp.rot90))];
-            const point2i BR = corners[static_cast<size_t>(pieceCornerFromBoardCorner(1, pp.rot90))];
-            const point2i BL = corners[static_cast<size_t>(pieceCornerFromBoardCorner(2, pp.rot90))];
-
-            const float w1 = dist2f(TL, TR);
-            const float w2 = dist2f(BL, BR);
-            const float h1 = dist2f(TL, BL);
-            const float h2 = dist2f(TR, BR);
-
-            const float wv = 0.5f * (w1 + w2);
-            const float hv = 0.5f * (h1 + h2);
-
-            colWidths[static_cast<size_t>(x)].push_back(wv);
-            rowHeights[static_cast<size_t>(y)].push_back(hv);
-        }
-    }
-
-    // Fallbacks: median of all image widths/heights
-    std::vector<float> allW, allH;
-    allW.reserve(static_cast<size_t>(objects_count));
-    allH.reserve(static_cast<size_t>(objects_count));
-    for (int obj = 0; obj < objects_count; ++obj) {
-        allW.push_back((float)objImages[static_cast<size_t>(obj)].width());
-        allH.push_back((float)objImages[static_cast<size_t>(obj)].height());
-    }
-    const int fallbackW = medianRounded(allW, 64);
-    const int fallbackH = medianRounded(allH, 64);
-
-    for (int x = 0; x < W; ++x) res.colW[static_cast<size_t>(x)] = medianRounded(colWidths[static_cast<size_t>(x)], fallbackW);
-    for (int y = 0; y < H; ++y) res.rowH[static_cast<size_t>(y)] = medianRounded(rowHeights[static_cast<size_t>(y)], fallbackH);
+    // 9) TODO Определим ширину/высоту каждого столбика/строки пазла (медиана от ширин/высот назначенных кусочков)
+    //    пока что в коде сделано наивно - везде ширина и толщина берется за 200 пикселей
+    // Подсказки:
+    // 1) сначала подумайте - что нам нужно выяснить из кода выше?
+    // 1.1) надо суметь пробежаться по регулярной решетке (переменная res.grid) по столбику и посмотреть какие куски-объекты в нем лежат
+    // 1.2) у этих кусков-объектов в столбике надо учесть их количество поворотов на 90 градусов (таких что side0 смотрит направо, side1 - вниз и т.д.)
+    // 2) а кто как индексируется в res.grid? можно выяснить посмотрев обращения к ней - нажмите правой кнопкой по ней -> Find Usages (или просто через Ctrl+F)
+    // 3) а что хранится в каждом элементе res.grid? тоже можно выяснить по аналогии - по примеру кода который туда записывал данные
+    // 4) а куда записать размер для каждого столбика? вот сюда (сейчас сюда пишется W штук чисел 200, где W - число столбиков):
+    res.colW = std::vector<int>(W, 200);
+    // 5) а куда записать размер для каждой строки? вот сюда (сейчас сюда пишется H штук чисел 200, где H - число строчек):
+    res.rowH = std::vector<int>(H, 200);
 
     // Prefix sums
     std::vector<int> xOff(static_cast<size_t>(W + 1), 0);
@@ -579,7 +545,7 @@ PuzzleAssemblyResult assemblePuzzle(
 
     for (int gy = 0; gy < H; ++gy) {
         for (int gx = 0; gx < W; ++gx) {
-            const PlacedPiece pp = res.grid[static_cast<size_t>(gy) * static_cast<size_t>(W) + static_cast<size_t>(gx)];
+            const PlacedPiece pp = res.grid[gy * W + gx];
             const int obj = pp.obj;
             const int rot = pp.rot90;
 
@@ -666,7 +632,7 @@ void printGrid(std::ostream& os, const PuzzleAssemblyResult& r) {
     os << "Puzzle grid: W=" << r.W << " H=" << r.H << "\n";
     for (int y = 0; y < r.H; ++y) {
         for (int x = 0; x < r.W; ++x) {
-            const auto pp = r.grid[static_cast<size_t>(y) * static_cast<size_t>(r.W) + static_cast<size_t>(x)];
+            const auto pp = r.grid[y * r.W + x];
             rassert(pp.obj >= 0, 90100030);
             os << "( obj" << pp.obj << " " << pp.rot90 << "x90 rot )";
             if (x + 1 != r.W) os << " ";
